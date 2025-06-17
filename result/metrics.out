@@ -1,0 +1,5 @@
+epoch=1 accuracy(test): 0.66
+epoch=2 accuracy(test): 0.66
+epoch=3 accuracy(test): 0.74
+epoch=4 accuracy(test): 0.77
+epoch=5 accuracy(test): 0.82
