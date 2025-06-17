@@ -25,13 +25,13 @@ def classify(data: np.ndarray, dim: int, threshold: float, label: int) -> np.nda
     h(x) = {  label   if x[dim] > threshold
            { -label   otherwise
     '''
-    raise NotImplementedError
+    return np.where(data[:, dim] > threshold, label, -1 * label)
 
 
 def weak_classifier(
     data: np.ndarray, 
-    labels: int, 
-    weights: float
+    labels: np.ndarray, 
+    weights: np.ndarray,
 ) -> tuple[int, float, int, np.ndarray]:
     '''
     Finds weak classifier that minimizes error under current point weights.
@@ -39,7 +39,22 @@ def weak_classifier(
     Returns parameters of best weak classifier, (dim, threshold, label) and predictions of
     weak classifier on dataset.
     '''
-    raise NotImplementedError
+    _, D = data.shape
+    
+    epsilon = 0.000001
+    min_error = np.Infinity
+    params = None
+
+    for d in range(D):
+        thresholds = np.insert(np.unique(data[:, d]), 0, np.min(data[:, d]) - epsilon)
+        for threshold in thresholds:
+            for l in [-1, +1]:
+                h = classify(data, d, threshold, l)
+                weighted_error = np.sum(weights * (labels != h))
+                if weighted_error < min_error:
+                    min_error = weighted_error
+                    params = d, threshold, l, h
+    return params # type: ignore
 
 
 def update_weights(
@@ -51,7 +66,8 @@ def update_weights(
     '''
     Returns updated point weights.
     '''
-    raise NotImplementedError
+    next_weights = current_weights * np.exp(-alpha * labels * predictions)
+    return next_weights / np.sum(next_weights)
 
 
 def train(
@@ -70,8 +86,28 @@ def train(
         weights (np.ndarray): final weights over data points -- (len(train_data),)
         test_accs (list): list of test accuracies over iterations -- (num_iters,)
     '''
-    raise NotImplementedError
+    N, _ = train_data.shape
+    weights = np.ones(N) / N
+    
+    weak_classifiers = []
+    alphas = []
+    test_accs = []
 
+    for _ in range(num_iter):
+        dim, threshold, label, predictions = weak_classifier(train_data, train_labels, weights)
+        weak_classifiers.append((dim, threshold, label))
+        
+        epsilon = np.sum(weights * (predictions != train_labels))
+        
+        alpha = np.log((1-epsilon) / epsilon) / 2
+        alphas.append(alpha)
+
+        acc, test_predictions = evaluate(weak_classifiers, alphas, test_data, test_labels)
+        test_accs.append(acc)
+
+        weights = update_weights(weights, alpha, predictions, train_labels)
+
+    return weak_classifiers, alphas, weights, test_accs, test_predictions
 
 def evaluate(
     weak_classifiers: list,
@@ -83,7 +119,11 @@ def evaluate(
     Evaluates adaboost model on test data.
     Returns test accuracy and predictions on test data.
     '''
-    raise NotImplementedError
+    predictions = np.zeros(len(test_data))
+    for (dim, threshold, label), alpha in zip(weak_classifiers, alpha_list):
+        predictions += classify(test_data, dim, threshold, label) * alpha
+    sign_predictions = np.sign(predictions)
+    return np.sum(sign_predictions == test_labels) / len(sign_predictions), sign_predictions
 
 
 if __name__ == '__main__':
@@ -102,13 +142,9 @@ if __name__ == '__main__':
     train_data, train_labels, test_data, test_labels = read_data(args)
 
     # Your train/test code goes here
-    raise NotImplementedError
+    weak_classifiers, alphas, weights, accs, preds = \
+        train(args.num_iters, train_data, train_labels, test_data, test_labels)
 
-    # Output writing code
-    # Assumes the following variables are defined
-    accs = None
-    preds = None
-    weights = None
 
     with open(args.metrics_out, "w") as f:
         for i in range(len(accs)):
