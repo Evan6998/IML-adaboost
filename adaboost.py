@@ -42,7 +42,7 @@ def weak_classifier(
     _, D = data.shape
     
     epsilon = 0.000001
-    min_error = np.Infinity
+    min_error = np.inf
     params = None
 
     for d in range(D):
